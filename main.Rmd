@@ -1,0 +1,651 @@
+---
+title: "Hourly Weather Data"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+runtime: shiny
+---
+
+```{r global, include = FALSE, warning = FALSE}
+#Install these packages manually if they are not installed yet.
+#Library for the nice layout UI.
+library(flexdashboard)
+#Library for calculating frosting formation.
+library(frost)
+#Library for Data Tables
+library(DT)
+#Legendary library for data manipulation.
+library(dplyr)
+#Legendary library for beautiful and powerful data visualization.
+library(ggplot2)
+#Library for handling dates.
+library(lubridate)
+#Library for the run-time, can be excluded. But ran just to be safe.
+library(shiny)
+#Library mainly used for it's s() function to remove Inf or NA values.
+library(hablar)
+
+#Extracting data from the master CSV file into a dataframe, tmf = TheMasterFile
+tmf <- read.csv("Hourly weather data.csv")
+#Creating a new default data frame from the dataframe for all of the things we would do, tmfdf = TheMasterFileDeFault
+tmfdf <- data.frame(tmf)
+
+#Convert table with POSIXct time_hour column with time removed
+tmfdftimestripped <- data.frame(tmf)
+newtime <- format(as.POSIXct(tmfdftimestripped$time_hour,format='%d/%m/%Y %H:%M'),format='%m/%d/%Y')
+tmfdftimestripped <- cbind(tmfdftimestripped, newtime)
+
+#Add bearing calculations
+tmfdftimestripped <- tmfdftimestripped %>% mutate(rw_bear = ifelse(wind_dir < 180, "0-180", "181-359") , .after = wind_dir)
+tmfdftimestripped <- tmfdftimestripped %>% mutate(rw_sel = case_when(origin == "JFK" & rw_bear == "0-180" ~ "13L/R or 04L/R",
+                                                   origin == "JFK" & rw_bear == "181-359" ~ "22L/R or 31L/R",
+                                                   origin == "LGA" & rw_bear == "0-180" ~ "4 or 13",
+                                                   origin == "LGA" & rw_bear == "181-359" ~ "22 or 31",
+                                                   ), .after = rw_bear)
+
+#Make a new table with units converted to metric
+tmfdfmetric <- data.frame(tmfdf)
+tmfdfmetric <- tmfdfmetric %>% mutate(temp =(temp - 32) * 5/9) 
+tmfdfmetric <- tmfdfmetric %>% mutate(dewp =(dewp - 32) * 5/9)
+tmfdfmetric <- tmfdfmetric %>% mutate(wind_speed = wind_speed * 1.60934)
+tmfdfmetric <- tmfdfmetric %>% mutate(wind_gust = wind_gust * 1.60934)
+tmfdfmetric <- tmfdfmetric %>% mutate(precip = precip * 25.4)
+tmfdfmetric <- tmfdfmetric %>% mutate(visib = visib * 1.60934)
+```
+
+Home
+=====================================
+
+Column {data-width=600}
+-------------------------------------
+### Assignment Question
+This assignment needs to explore hourly weather data set and categorize it by different techniques in such a way that it should retrieve the necessary information which helps to do a decision making. Your analysis should be deep and in detail, also it must go further than what has already been covered in this course.
+
+You have to import the data then do the necessary pre-processing on the dataset, use the necessary commands to convert it into the desired format. 
+
+> You have to apply the data visualization, exploration, and manipulation techniques in your project.  
+*It is very important to explain and justify the techniques that have been chosen.*  
+Outline the findings, analyse them, and justify correctly with appropriate graphs.  
+Also, a supporting document is needed to reflect the graph and code using R programming concepts.  
+Additional features must explore further concepts that can improve retrieval effects.
+
+The dataset provided for this assignment is related to the hourly meteorological data for **LaGuardia Airport (LGA) and John F. Kennedy International Airport (JFK) in the United States**.  
+
+It contains **15 columns and 17,412 rows**. The columns with the description are given in the table below.
+
+### Reference: 
+The data here is analyzed by referencing to:  
+**F.O John Paolo C. Velasco**  
+**Airbus 320 Rated Pilot**  
+**CPL/IR**  
+
+```{r}
+url_of_theman <- "https://instagram.fkul13-1.fna.fbcdn.net/v/t51.2885-15/e35/123552679_787929701767995_9167434890487078572_n.jpg?_nc_ht=instagram.fkul13-1.fna.fbcdn.net&_nc_cat=103&_nc_ohc=l9_z4SkuYgMAX9r3bot&tp=18&oh=247d476f6d8caab649b3cd58fab729f3&oe=5FCFE2E3&ig_cache_key=MjQzNjI3MDYyMzg2NDIzOTc3Nw%3D%3D.2"
+```
+![Image of John Paolo C.Velasco](`r url_of_theman`)  
+
+Column {data-width=400}
+-------------------------------------
+### List of data recorded and it's notation
+* Recordings
+  + Time (year, month, day, hour)
+  + Temperature (in Fahrenheit)
+  + Dew Point (in Fahrenheit)
+  + Precipitation (in Inches)
+  + Humidity (Relative)
+  + Pressure (Sea Level in Millibars)
+  + Wind Direction (in Degrees)
+  + Wind Speed (in mph)
+  + Wind Gust Speed (in mph)
+  + Origin (Weather Station)
+  + Visibility (in Miles)
+
+
+
+Interactive Table {data-orientation=rows}
+=====================================
+Inputs {.sidebar}
+------------------------------------
+***
+
+**CHOOSE YOUR DATA:**
+
+***
+
+```{r echo = FALSE}
+checkboxGroupInput(inputId = "show_cols",
+                   label = NULL,
+                   selected = names(tmfdf),
+                   choiceNames = list("Origin", "Year", "Month", "Day", "Hour", "Temperature", "Dew Point", "Humidity (Relative)", "Wind Direction", "Wind Speed", "Wind Gust", "Precipitation ", "Pressure", "Visibility", " Time format in POSIXct"),
+                   choiceValues = list("origin", "year", "month", "day", "hour", "temp", "dewp", "humid", "wind_dir", "wind_speed", "wind_gust", "precip", "pressure", "visib", "time_hour"))
+                    
+```
+
+Row {data-height=100}
+-------------------------------------
+### Additional Notes
+The table below is in the default format, as it is in the United States of America. The format follows an imperial standard. "Temperature" is in Fahrenheit, "Dew Point" is in Fahrenheit, "Humidity" is in a relative percentage and is not an absolute humidity. "Wind Direction" is in mph, "Wind Speed" is in mph, "Wind Gust" is in mph, "Precipitation " is in Inches, "Pressure" is in mbar, "Visibility" is in miles.
+
+Row
+-------------------------------------
+### Recordings from LaGuardia Airport (LGA) and John F. Kennedy International Airport (JFK)
+```{r}
+    id = 'dataset'
+    tabPanel("Main Dataset", DT::dataTableOutput("mytable1"))
+  # choose columns to display
+  output$mytable1 <- DT::renderDataTable({
+    DT::datatable(tmfdf[, input$show_cols, drop = FALSE])
+  })
+```
+
+Row {data-height=50}
+-------------------------------------
+### Additional Notes
+The table below in metric format. All the imperial units from temperature, dew point, speed has been converted to metric.
+
+Row
+-------------------------------------
+### Recordings from LaGuardia Airport (LGA) and John F. Kennedy International Airport (JFK) in metric.
+```{r}
+    id = 'datasetmetric'
+    tabPanel("Main Dataset", DT::dataTableOutput("mytable2"))
+  # choose columns to display
+  output$mytable2 <- DT::renderDataTable({
+    DT::datatable(tmfdfmetric[, input$show_cols, drop = FALSE])
+  })
+```
+
+
+Static Visualization
+=====================================
+
+Column {data-width=500}
+-------------------------------------
+
+### Number of recordings per month
+```{r}
+renderPlot({
+  ggplot(tmfdf, aes(x=month)) + geom_histogram(binwidth = 1, color = "black", fill = "lightblue") + scale_x_continuous(name = "Months (in Numbers)", breaks = 1:12) + scale_y_continuous(name = "Number of recordings", breaks = seq(0,1500,10), limits = c(1300,1500), oob = scales::squish, expand = c(0,5)) + stat_count(geom = "text", colour = "black", size = 4, aes(label = ..count..), position = position_stack(vjust = 1.005))
+})
+```
+
+### Number of data without missing data (NA)
+```{r}
+renderPlot({
+  filterednadf <-  filter(tmfdftimestripped) %>% na.exclude
+  max <- as.integer(count(filterednadf)/6)
+  ggplot(filterednadf, aes(x=month, color = origin)) + geom_histogram(binwidth = 1, fill = "darkgray") + scale_x_continuous(name = "Months (in Numbers)", breaks = 1:12) + scale_y_continuous(name = "Number of recordings", breaks = seq(0,max,100), limits = c(0,max), oob = scales::squish, expand = c(0,50)) + stat_count(geom = "text", colour = "black", size = 3, aes(label = ..count..), position = position_stack(vjust = 1))
+})
+
+```  
+
+### Difference of data with and without missing data (NA)
+```{r}
+renderPlot({
+  dfdiff <- filter(tmfdftimestripped) %>% na.exclude
+  origin <- c("JFK", "LGA")
+  totalJFK <- as.integer(count(filter(tmfdftimestripped, origin == "JFK")))
+  totalLGA <- as.integer(count(filter(tmfdftimestripped, origin == "JFK")))
+  pureJFK <-  as.integer(count(filter(dfdiff, origin == "JFK")))
+  pureLGA <- as.integer(count(filter(dfdiff, origin == "LGA")))
+  
+  totalvpuredf <- data.frame(
+  total = c(totalJFK, totalLGA),
+  pure = c(pureJFK, pureLGA),
+  difference = c(totalJFK - pureJFK, totalLGA - pureLGA))
+  
+  ggplot(data=totalvpuredf, aes(x=origin, y=total, fill=pure)) +
+  geom_bar(stat="identity") + geom_text(aes(label=total), vjust=1.6, color="white", size=3.5)
+})
+```
+
+
+Column {data-width=500}
+-------------------------------------
+
+### Origins of the recordings
+```{r}
+renderPlot({
+  ggplot(tmfdf, aes(x=month, color = origin)) + geom_histogram(binwidth = 1, fill = "lightyellow") + scale_x_continuous(name = "Months (in Numbers)", breaks = 1:12) + scale_y_continuous(name = "Number of recordings", breaks = seq(0,1500,100), limits = c(0,1500), oob = scales::squish, expand = c(0,50)) + stat_count(geom = "text", colour = "black", size = 3, aes(label = ..count..), position = position_stack(vjust = 1))
+})
+```  
+
+### Times when it is dangerous only for Large Body Aircrafts to fly in both airports
+```{r}
+renderTable({
+filter(tmfdftimestripped, wind_speed >= 34.5234) %>% select(origin, year, month, hour, wind_speed)
+})
+```  
+**Why?**  
+Wind speeds exceed 30 knots (34.5234 mph) is dangerous for Large Body Aircrafts like the Airbus A320 to fly.
+
+
+### Times when it's dangerous tand illegal to fly in both airports
+```{r}
+output$safeflight <- DT::renderDataTable({
+    safedf <- filter(tmfdftimestripped, visib < 3 ) %>% select(origin, year, month, day, hour, visib)
+    DT::datatable(safedf)
+  })
+DT::dataTableOutput("safeflight")
+```  
+
+### Months more dangerous than the yearly average due to low visibility in both airports:   
+```{r}
+output$mostdangerousmonthsstatic <- renderTable({
+  safedf <- filter(tmfdftimestripped, visib < 3 ) %>% select(origin, year, month, day, hour, visib)
+  monthlycounterdf <- count(safedf, month)
+  abvavg <- filter(monthlycounterdf, n > mean(n))
+  abvavg %>% mutate(MonthName = month.name[month], .before = month)
+})
+tableOutput('mostdangerousmonthsstatic')
+```
+
+
+Day Visualization {data-orientation=rows}
+=====================================
+Inputs {.sidebar}
+------------------------------------
+***
+
+**CHOOSE YOUR DATE:**
+
+***
+
+```{r}
+firstrec <- format(as.POSIXct(min(tmfdftimestripped$newtime),format='%m/%d/%Y'),format='%Y/%m/%d')
+lastrec <- format(as.POSIXct(max(tmfdftimestripped$newtime),format='%m/%d/%Y'),format='%Y/%m/%d')
+
+dateInput("dateselector1", label = "Choose a day to view details about the day", 
+               format = "dd-mm-yyyy",
+               value = firstrec,
+               min = firstrec, 
+               max = lastrec)
+
+sliderInput(
+  inputId = "timeselector",
+  label = "Choose the time:",
+  min = 0,
+  max = 23,
+  value = c(0,23),
+  step = 1,
+  dragRange = TRUE
+)
+```
+**SELECTED DATE:**
+```{r}
+renderText({
+  as.character(input$dateselector1)
+})
+```
+**SELECTED STATION:**
+```{r}
+selectInput(
+  inputId = "airportchoice1",
+  label = "Airport choice:",
+  choices = c("JFK", "LGA"),
+  selected = "JFK",
+  multiple = FALSE,
+  selectize = TRUE,
+  width = NULL,
+  size = NULL
+)
+```
+
+
+Row
+-------------------------------------
+### Details about the day
+```{r}
+#Render reactive table
+selectedday <- reactive({
+  da <- filter(tmfdftimestripped, newtime == format(as.POSIXct(input$dateselector1,format='%Y/%m/%d'),format='%m/%d/%Y') & origin == input$airportchoice1 & hour >= input$timeselector[1] & hour <= input$timeselector[2])
+    da <- as.data.frame(da)
+    return(da)
+})
+output$daytable <- renderTable(selectedday())
+
+#Render Table View
+output$daytableview <- DT::renderDataTable({
+  DT::datatable(selectedday())
+})
+DT::dataTableOutput("daytableview")
+```
+
+
+Row {data-height=100}
+-------------------------------------
+### Number of recordings on that day:  
+```{r}
+output$numberofrecordings <- renderText({
+ nrow(selectedday())
+})
+textOutput('numberofrecordings')
+```  
+
+### Highest temperature in Fahrenheits:
+```{r}
+output$highesttemp <- renderText({
+ max(selectedday()$temp)
+})
+textOutput('highesttemp')
+```  
+
+### Average temperature in Fahrenheits:
+```{r}
+output$avgtemp <- renderText({
+  mean(selectedday()$temp)
+  })
+textOutput('avgtemp')
+```  
+
+### Lowest temperature in Fahrenheits:
+```{r}
+output$lowesttemp <- renderText({
+  min(selectedday()$temp)
+  })
+textOutput('lowesttemp')
+```  
+
+### Frosting occurence in which hour
+```{r}
+output$frosting<- renderText({
+  frostingpointlist <- selectedday() %>% filter(temp <= 32) %>% select(hour)
+  for(items in frostingpointlist){
+    return(items)
+  }
+  })
+textOutput('frosting')
+```  
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+### Temperature fluctuation of the day
+```{r}
+output$temperaturechart <- renderPlot({
+  g <- ggplot(selectedday(), aes(hour, temp))
+  g + geom_bar(stat="identity", width = 0.5, fill="tomato2") + 
+      labs(title="Temperature fluctuations of the day", 
+           subtitle="Represented in a barchart", 
+           caption="Source: Temperature from the 'Hourly weather data.csv' dataset") +
+      theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+    geom_line(aes(x=hour, y=32), color = "black") + scale_x_continuous(name = "Time in 24H format", breaks = selectedday()$hour) + scale_y_continuous(name = "Temperature in °F")
+})
+plotOutput('temperaturechart')
+```  
+
+### < Analysis
+**THE BLACK LINE INDICATES:** 
+
+* Values above black line = good for flights.  
+
+* Values below black line = bad for flights.  
+
+**Recommendation:**  
+
+* Reduce flights during times where temperatures are below 32°F.  
+
+**Explanation:**
+When temperatures are below 32°F, Ice will start to form and Ice typically builds up when tiny cloud droplets impact and freeze on the leading edges, or front surfaces, of the plane. The ice alters airflow over the wing and tail, reducing the lift force that keeps the plane in the air, and potentially causing aerodynamic stall—a condition that can lead to a temporary loss of control. Thus it is cautionary to reduce flights during this period.  
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+### Indicators
+```{r}
+output$freq_of_runway_availability <- renderPlot({
+  toru <- selectedday() %>% count(rw_sel)
+  ggplot(toru, aes(x=rw_sel, y=n)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=n), vjust=1.6, color="white", size=7.5)+ labs(y = "Frequency of Availability", x = "Runway Name", title = "Frequency of Runway Availability") +
+  theme_minimal()
+})
+
+plotOutput('freq_of_runway_availability')
+```
+
+
+### General Explanation
+The right runway chose to takeoff is important as it:  
+
+* Less groundspeed needed for takeoff
+* Less runway needed
+* Easier on tires/brakes
+* Greater climb angle/Steeper descent angle
+
+When you see runway numbers, add zero to the end to make it a 3 digit number and you can then see the angle of the runway.
+
+Wind facing the opposite of the runway angle in 180-degree front facing view would be the active runway and is the most optimal.
+
+### < Runway Layout for JFK Airport
+```{r}
+url <- "https://acukwik.com/extimages/Listing-Images/KJFK.jpg"
+```
+![Image of JFK runway layout](`r url`)
+
+### < Runway Layout for LGA Airport
+```{r}
+url2 <- "https://flttrack.fltplan.com/AirportDiagrams/KLGAapt.jpg"
+```
+![Image of LGA runway layout](`r url2`)
+
+Date Range Visualization {data-orientation=rows}
+=====================================
+Inputs {.sidebar}
+------------------------------------
+***
+
+**CHOOSE YOUR DATE RANGE:**
+
+***
+```{r}
+firstrec <- format(as.POSIXct(min(tmfdftimestripped$newtime),format='%m/%d/%Y'),format='%Y/%m/%d')
+lastrec <- format(as.POSIXct(max(tmfdftimestripped$newtime),format='%m/%d/%Y'),format='%Y/%m/%d')
+
+dateRangeInput("daterange1", label = "From when to when?", 
+               format = "dd-mm-yyyy",
+               start = firstrec, 
+               end = lastrec,
+               min = firstrec, 
+               max = lastrec)
+sliderInput(
+  inputId = "timeselector2",
+  label = "Choose the time:",
+  min = 0,
+  max = 23,
+  value = c(0,23),
+  step = 1,
+  dragRange = TRUE
+)
+```
+**SELECTED DATE RANGE:**
+```{r}
+renderText({
+  as.character(input$daterange1)
+})
+```
+**SELECTED STATION:**
+```{r}
+selectInput(
+  inputId = "airportchoice2",
+  label = "Airport choice:",
+  choices = c("JFK", "LGA"),
+  selected = "JFK",
+  multiple = FALSE,
+  selectize = TRUE,
+  width = NULL,
+  size = NULL
+)
+```  
+
+Row
+-------------------------------------  
+
+### Details about the time range selected :  
+
+```{r}
+selectedrange <- reactive({
+    dar <- filter(tmfdftimestripped, newtime >= format(as.POSIXct(input$daterange1[1],format='%Y/%m/%d'),format='%m/%d/%Y') & newtime <= format(as.POSIXct(input$daterange1[2],format='%Y/%m/%d'),format='%m/%d/%Y') & origin == input$airportchoice2 & hour >= input$timeselector2[1] & hour <= input$timeselector2[2])
+    dar <- as.data.frame(dar)
+    return(dar)
+})
+output$rangetable <- renderTable(selectedrange())
+
+output$rangetableview <- DT::renderDataTable({
+  DT::datatable(selectedrange())
+})
+DT::dataTableOutput("rangetableview")
+```  
+
+Row {data-height=100}
+-------------------------------------
+### Number of recordings throughout this period:  
+```{r}
+output$numberofrecordingsrange <- renderText({
+ nrow(selectedrange())
+})
+textOutput('numberofrecordingsrange')
+```  
+
+### Highest temperature of this period in Fahrenheits :
+```{r}
+output$highesttemprange <- renderText({
+ max(selectedrange()$temp)
+})
+textOutput('highesttemprange')
+```  
+
+### Average temperature of this period in Fahrenheits:
+```{r}
+output$avgtemprange <- renderText({
+  mean(selectedrange()$temp)
+  })
+textOutput('avgtemprange')
+```  
+
+### Lowest temperature of this period in Fahrenheits:
+```{r}
+output$lowesttemprange <- renderText({
+  min(selectedrange()$temp)
+  })
+textOutput('lowesttemprange')
+```  
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+### Temperature fluctuations
+```{r}
+output$temperaturechartrange <- renderPlot({
+  temp_fluc <- selectedrange() %>% group_by(month) %>% summarise(mean_temp = mean(temp))
+  g <- ggplot(temp_fluc, aes(month, mean_temp))
+  g + geom_line(aes(y=mean_temp), color = "darkblue", size = 1.2) + 
+      labs(title="Bar Chart of temperature fluctuation", 
+           subtitle="Temperature fluctuations of the given period", 
+           caption="Source: Temperature from the 'Hourly weather data.csv' dataset") +
+      theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+    geom_line(aes(x=month, y=32), color = "green") + scale_x_continuous(name = "Months", breaks = temp_fluc$month) + geom_point(color="yellow", size=3)
+})
+plotOutput('temperaturechartrange')
+```  
+
+### < Analysis
+**THE GREEN LINE INDICATES:**  
+
+* Values above green line = good for flights.  
+
+* Values below green line = bad for flights.  
+
+**Recommendation:**  
+
+* Reduce flights during times where temperatures are below 32°F.  
+
+**Explanation:**  
+
+When temperatures are below 32°F, Ice will start to form and Ice typically builds up when tiny cloud droplets impact and freeze on the leading edges, or front surfaces, of the plane. The ice alters airflow over the wing and tail, reducing the lift force that keeps the plane in the air, and potentially causing aerodynamic stall—a condition that can lead to a temporary loss of control. Thus it is cautionary to reduce flights during this period.  
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+### Indicators
+```{r}
+output$freq_of_runway_availability_range <- renderPlot({
+  toru <- selectedrange() %>% count(rw_sel)
+  ggplot(toru, aes(x=rw_sel, y=n)) + 
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=n), vjust=-0.3, color="black", size=6.5)+ labs(y = "Frequency of Availability", x = "Runway Name", title = "Frequency of Runway Availability") +
+  theme_minimal()
+})
+
+plotOutput('freq_of_runway_availability_range')
+```
+
+
+### General Explanation
+The right runway chose to takeoff is important as it:  
+
+* Less groundspeed needed for takeoff
+* Less runway needed
+* Easier on tires/brakes
+* Greater climb angle/Steeper descent angle
+
+When you see runway numbers, add zero to the end to make it a 3 digit number and you can then see the angle of the runway.
+
+Wind facing the opposite of the runway angle in 180-degree front facing view would be the active runway and is the most optimal.
+
+### < Runway Layout for JFK Airport
+```{r}
+url <- "https://acukwik.com/extimages/Listing-Images/KJFK.jpg"
+```
+![Image of JFK runway layout](`r url`)
+
+### < Runway Layout for LGA Airport
+```{r}
+url2 <- "https://flttrack.fltplan.com/AirportDiagrams/KLGAapt.jpg"
+```
+![Image of LGA runway layout](`r url2`)
+
+
+Row
+-------------------------------------
+### Table data of illegal and dangerous times to fly
+```{r}
+output$safeflightrange <- DT::renderDataTable({
+    safedf <- filter(selectedrange(), visib < 3 ) %>% select(origin, year, month, day, hour, visib)
+    DT::datatable(safedf)
+  })
+DT::dataTableOutput("safeflightrange")
+```
+
+Row {data-height=500}
+-------------------------------------
+### Analysis of the table above:
+```{r}
+output$monthlydangercounter <- renderPlot({
+  safedf <- filter(selectedrange(), visib < 3 ) %>% select(origin, year, month, day, hour, visib)
+  monthlycounterdf <- count(safedf, month)
+  hourlycounterdf <- count(safedf, hour)
+  
+  ggplot(monthlycounterdf, aes(x=month, y=n)) + 
+  geom_point(size=5, color="red", fill=alpha("orange", 0.3), alpha=0.7, shape=21, stroke=2) + 
+  geom_segment(aes(x=month, 
+                   xend=month, 
+                   y=0, 
+                   yend=n)) + 
+  labs(title="Lollipop Chart of", 
+       subtitle="Dangerous times to fly", 
+       caption="source: Number of times it is dangerous to fly each month") + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) + scale_x_continuous(name = "Months") + ggtitle(label = "Number of dangerous times to fly for the selected period") + geom_text(aes(label=n), vjust=2.0, color="black", size=6.5)
+  
+  })
+plotOutput('monthlydangercounter')
+```  
+
+Row
+-------------------------------------
+### Months more dangerous than the periods's average due to low visibility: 
+```{r}
+output$mostdangerousmonths <- renderTable({
+  safedf <- filter(selectedrange(), visib < 3 ) %>% select(origin, year, month, day, hour, visib)
+  monthlycounterdf <- count(safedf, month)
+  abvavg <- filter(monthlycounterdf, n > mean(n))
+  abvavg %>% mutate(MonthName = month.name[month], .before = month)
+})
+tableOutput('mostdangerousmonths')
+```
