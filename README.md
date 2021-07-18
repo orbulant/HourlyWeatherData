@@ -1,6 +1,7 @@
 # HourlyWeatherData
 Using R, i have created a comprehensive R tool (with Shiny and etc.) to analyse hourly weather data from 2 Airport Stations.
 
+This assignment was graded an A+ (GPA 4.00) by Asia Pacific University lecturers. 
 ## Screenshots
 Below are some screenshots: 
 |Screenshots|
